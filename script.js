@@ -37,6 +37,117 @@
 
   var selected = null;
   var saved = false;
+  var STORAGE_KEY = "516klappen-bokning";
+
+  function readDraft() {
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function writeDraft() {
+    try {
+      var payload = {
+        weekKey: formValue("fieldWeekKey"),
+        week: formValue("fieldWeek"),
+        checkIn: formValue("fieldIn"),
+        checkOut: formValue("fieldOut"),
+        priceSek: formValue("fieldPrice"),
+        name: formValue("guestName"),
+        email: formValue("guestEmail"),
+        phone: formValue("guestPhone"),
+        guests: formValue("guestCount"),
+        message: formValue("guestMessage"),
+        saved: saved
+      };
+      if (saved) {
+        var statusEl = field("requestStatus");
+        payload.status = statusEl ? statusEl.textContent : "";
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (e) {}
+  }
+
+  function forgetDraft() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (e) {}
+  }
+
+  function formValue(id) {
+    var el = field(id);
+    return el ? el.value : "";
+  }
+
+  function restoreText(id, value) {
+    var el = field(id);
+    if (!el) return;
+    if (typeof value === "string" || typeof value === "number") el.value = String(value);
+  }
+
+  function findStoredWeek(key) {
+    var seasons = ["winter", "summer"];
+    var s, weeks, i;
+    for (s = 0; s < seasons.length; s++) {
+      weeks = buildWeeks(seasons[s]);
+      for (i = 0; i < weeks.length; i++) {
+        if (weeks[i].key === key) return { season: seasons[s], week: weeks[i] };
+      }
+    }
+    return null;
+  }
+
+  function showSeason(seasonKey) {
+    var tabs = document.querySelectorAll(".seasons button");
+    tabs.forEach(function (t) {
+      t.setAttribute("aria-selected", t.getAttribute("data-season") === seasonKey ? "true" : "false");
+    });
+    render(seasonKey);
+  }
+
+  function restoreDraft() {
+    var data = readDraft();
+    if (!data) return false;
+    restoreText("guestName", data.name);
+    restoreText("guestEmail", data.email);
+    restoreText("guestPhone", data.phone);
+    restoreText("guestCount", data.guests);
+    restoreText("guestMessage", data.message);
+    var key = typeof data.weekKey === "string" ? data.weekKey : "";
+    var found = key ? findStoredWeek(key) : null;
+    if (found && canBook(found.week)) {
+      selected = found.week;
+      setHidden(selected);
+      setHint();
+      renderChoice();
+      if (data.saved === true) {
+        saved = true;
+        if (typeof data.status === "string") setStatus(data.status, "saved");
+      }
+      showSeason(found.season);
+      return true;
+    }
+    if (key) {
+      selected = null;
+      saved = false;
+      setHidden(null);
+      setHint();
+      renderChoice();
+      setStatus("Den tidigare valda veckan kan inte längre väljas. Välj en vecka igen. Inget mejl har skickats.", "error");
+      render("winter");
+      return true;
+    }
+    setHint();
+    renderChoice();
+    render("winter");
+    return true;
+  }
 
   function toDate(str) {
     var p = str.split("-");
@@ -339,6 +450,7 @@
     setHint();
     renderChoice();
     render(currentSeason());
+    writeDraft();
     var box = field("valdVecka");
     if (!box) return;
     var narrow = window.matchMedia("(max-width: 899px)").matches;
@@ -349,7 +461,7 @@
     box.focus({ preventScroll: !narrow });
   }
 
-  function clearWeek() {
+  function clearWeek(dropStorage) {
     selected = null;
     saved = false;
     setHidden(null);
@@ -361,6 +473,7 @@
       var el = field(id);
       if (el) el.removeAttribute("aria-invalid");
     });
+    if (dropStorage) forgetDraft();
   }
 
   function markInvalid(id, on) {
@@ -445,6 +558,7 @@
     ];
     saved = true;
     setStatus(lines.join("\n"), "saved");
+    writeDraft();
     var status = field("requestStatus");
     if (status) status.focus && status.setAttribute("tabindex", "-1");
     if (status) status.focus();
@@ -460,7 +574,7 @@
         tabs.forEach(function (t) {
           t.setAttribute("aria-selected", t === tab ? "true" : "false");
         });
-        clearWeek();
+        clearWeek(true);
         render(tab.getAttribute("data-season"));
       });
     });
@@ -474,14 +588,16 @@
       form.addEventListener("input", function (event) {
         var t = event.target;
         if (t && t.id) markInvalid(t.id, false);
-        if (!saved) return;
-        saved = false;
-        setStatus("Ändringen är inte sparad. Spara igen om det här ska gälla. Inget mejl skickas.", "");
+        if (saved) {
+          saved = false;
+          setStatus("Ändringen är inte sparad. Spara igen om det här ska gälla. Inget mejl skickas.", "");
+        }
+        writeDraft();
       });
     }
 
     clearWeek();
-    render("winter");
+    if (!restoreDraft()) render("winter");
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
