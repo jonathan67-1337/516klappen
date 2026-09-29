@@ -11,17 +11,20 @@
     summer: { start: "2027-05-01", end: "2027-10-31", label: "Sommar 2027" }
   };
 
-  /* Booked on the live page, and not a premium week 7–9 or 12–13.
-     v7–v9 were booked in the old script but are premium in the price text,
-     so they are not kept as booked. v13 is the exception: see index.html. */
+  /* Vecka 7–9 är bokade (Jonathan 2026-09-29). De är också premium i prislistan,
+     men bokad vinner så de går inte att välja. Vecka 12 är premium och inte bokad.
+     Vecka 13 är bokad. Vecka 14 är inte premium. */
   var BOOKED = {
     "2026-W51": true,
+    "2027-W07": true,
+    "2027-W08": true,
+    "2027-W09": true,
     "2027-W11": true,
     "2027-W13": true
   };
 
-  /* Price text: vecka 7–9 samt 12–13. v13 stays booked, not premium.
-     Old script had v14 as premium; the text does not, so v14 is ordinary. */
+  /* Premium i prislistan: vecka 7–9 och 12. Vecka 7–9 är ändå bokade.
+     Vecka 13 är bokad, inte premium. Vecka 14 är inte premium. */
   var PREMIUM = {
     "2027-W07": true,
     "2027-W08": true,
