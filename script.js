@@ -86,6 +86,12 @@
   function sek(n) {
     return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0") + "\u00a0kr";
   }
+  function kronor(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ") + " kr";
+  }
+  function nightPhrase(n) {
+    return n === 1 ? "1 natt" : n + " nätter";
+  }
   function field(id) { return document.getElementById(id); }
 
   function nightsOf(w) {
@@ -94,9 +100,9 @@
   function priceOf(w) {
     var nights = nightsOf(w);
     if (nights < 1) return { nights: nights, amount: 0, kind: "none" };
+    if (nights < 7) return { nights: nights, amount: nights * PRICE_DAY, kind: "days" };
     if (w.premium) return { nights: nights, amount: PRICE_PREMIUM, kind: "premium" };
-    if (nights >= 7) return { nights: nights, amount: PRICE_WEEK, kind: "week" };
-    return { nights: nights, amount: nights * PRICE_DAY, kind: "days" };
+    return { nights: nights, amount: PRICE_WEEK, kind: "week" };
   }
   function priceLabel(p) {
     if (p.kind === "premium") return sek(p.amount) + ", premiumvecka";
@@ -141,14 +147,15 @@
     return d.getFullYear() + "-" + pad(d.getMonth() + 1);
   }
 
-  function stateText(w, price, isSel) {
-    var base;
-    if (w.booked) base = "Bokad";
-    else if (price.kind === "none") base = "Ingen natt i säsongen";
-    else if (w.premium) base = "Premium · " + sek(price.amount);
-    else if (price.kind === "days") base = "Ledig · " + price.nights + " dygn · " + sek(price.amount);
-    else base = "Ledig · " + sek(price.amount);
-    return isSel ? "Vald · " + base : base;
+  function weekAria(w, price, isSel) {
+    var label = "Vecka " + w.week + ", " + fmtLong(w.from) + "–" + fmtLong(w.to);
+    if (w.booked) label += ", Bokad";
+    else {
+      label += ", " + kronor(price.amount);
+      if (price.nights < 7) label += ", " + nightPhrase(price.nights);
+    }
+    if (isSel) label += ", vald";
+    return label;
   }
 
   function render(seasonKey) {
@@ -161,8 +168,8 @@
     var index = {};
     weeks.forEach(function (w) {
       var price = priceOf(w);
+      if (price.nights < 1) return;
       if (w.booked) counts.booked += 1;
-      else if (price.kind === "none") counts.short += 1;
       else if (w.premium) counts.premium += 1;
       else counts.ok += 1;
       var mk = monthKey(w.from);
@@ -183,28 +190,44 @@
       wrap.className = "weeks";
       g.items.forEach(function (w) {
         var price = priceOf(w);
+        if (price.nights < 1) return;
         var btn = document.createElement("button");
         btn.type = "button";
-        var cls = w.booked ? "booked" : (price.kind === "none" ? "short" : (w.premium ? "premium" : "ok"));
+        var cls = w.booked ? "booked" : (w.premium ? "premium" : "ok");
         var isSel = !!(selected && selected.key === w.key);
         btn.className = "week " + cls + (isSel ? " is-selected" : "");
-        var state = stateText(w, price, isSel);
         btn.setAttribute("aria-pressed", isSel ? "true" : "false");
-        if (!canBook(w)) btn.setAttribute("aria-disabled", "true");
-        btn.setAttribute("aria-label", "Vecka " + w.week + ", " + fmtLong(w.from) + "–" + fmtLong(w.to) + ", " + state);
+        if (!canBook(w)) {
+          btn.disabled = true;
+          btn.setAttribute("aria-disabled", "true");
+        }
+        btn.setAttribute("aria-label", weekAria(w, price, isSel));
         var num = document.createElement("span");
         num.className = "num";
         num.textContent = "v" + w.week;
         var when = document.createElement("span");
         when.className = "when";
         when.textContent = fmtDay(w.from) + "–" + fmtDay(w.to);
-        var stateEl = document.createElement("span");
-        stateEl.className = "state";
-        stateEl.textContent = state;
         btn.appendChild(num);
         btn.appendChild(when);
-        btn.appendChild(stateEl);
-        btn.addEventListener("click", function () { choose(w); });
+        if (w.booked) {
+          var stateEl = document.createElement("span");
+          stateEl.className = "state";
+          stateEl.textContent = "Bokad";
+          btn.appendChild(stateEl);
+        } else {
+          var priceEl = document.createElement("span");
+          priceEl.className = "price";
+          priceEl.textContent = kronor(price.amount);
+          btn.appendChild(priceEl);
+          if (price.nights < 7) {
+            var nightsEl = document.createElement("span");
+            nightsEl.className = "nights";
+            nightsEl.textContent = nightPhrase(price.nights);
+            btn.appendChild(nightsEl);
+          }
+        }
+        if (canBook(w)) btn.addEventListener("click", function () { choose(w); });
         wrap.appendChild(btn);
       });
       block.appendChild(h);

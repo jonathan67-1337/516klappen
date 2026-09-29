@@ -314,8 +314,9 @@ ul.plain li, ol.plain li { margin: 0.35rem 0; }
 .week {
   display: grid;
   grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
+  grid-template-rows: auto auto auto;
   column-gap: 10px;
+  row-gap: 1px;
   align-items: baseline;
   text-align: left;
   width: 100%;
@@ -329,12 +330,39 @@ ul.plain li, ol.plain li { margin: 0.35rem 0; }
 }
 .week .num {
   font-family: var(--serif);
-  font-size: 1.15rem;
-  grid-row: span 2;
+  font-size: 1.05rem;
+  grid-row: 1 / span 3;
+  align-self: center;
   min-width: 2.6rem;
+  color: var(--muted);
 }
-.week .when { font-size: 0.92rem; }
+.week .when { font-size: 0.88rem; color: var(--muted); grid-column: 2; }
 .week .state { font-size: 0.8rem; color: var(--muted); grid-column: 2; }
+.week .price {
+  grid-column: 2;
+  font-family: var(--serif);
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.week .nights {
+  grid-column: 2;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+.week:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+@media (prefers-color-scheme: light) {
+  .week .price { color: var(--ink); }
+}
+@media (prefers-color-scheme: dark) {
+  .week .price { color: #1c140e; }
+}
+
 .week.ok { border-color: color-mix(in srgb, var(--moss) 45%, var(--line)); }
 .week.premium {
   background: #f6efe2;
