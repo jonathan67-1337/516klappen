@@ -431,7 +431,7 @@
     var clock = pad(now.getHours()) + ":" + pad(now.getMinutes());
     var lines = [
       "Sparat på den här sidan kl. " + clock + ".",
-      "Inget mejl har skickats. E-post är inte kopplat ännu, så ingen har tagit emot förfrågan.",
+      "Inget mejl har skickats, så ingen har tagit emot förfrågan. Hör av er på +46 70 327 58 45 eller mikaelvispen@gmail.com.",
       "",
       "Vecka " + selected.week + ", " + selected.year,
       "Incheckning: " + weekday(selected.from) + " " + fmtLong(selected.from),
