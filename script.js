@@ -1,11 +1,6 @@
 (function () {
   "use strict";
 
-  var FORM = "https://docs.google.com/forms/d/e/1FAIpQLSd9ln4SxS2innp2ePUCPE21DtUbBS9gO1Y-4n2cksiLSqfEuw/viewform";
-  var ENTRY_WEEK = "377884520";
-  var ENTRY_IN = "1022203339";
-  var ENTRY_OUT = "1281773319";
-
   var SEASONS = {
     winter: { start: "2026-12-01", end: "2027-04-30", label: "Vinter 2026–2027" },
     summer: { start: "2027-05-01", end: "2027-10-31", label: "Sommar 2027" }
@@ -32,10 +27,16 @@
     "2027-W12": true
   };
 
+  var PRICE_WEEK = 7700;
+  var PRICE_DAY = 1100;
+  var PRICE_PREMIUM = 11000;
+
   var MONTHS = ["januari", "februari", "mars", "april", "maj", "juni", "juli", "augusti", "september", "oktober", "november", "december"];
   var MONTHS_SHORT = ["jan", "feb", "mars", "apr", "maj", "juni", "juli", "aug", "sep", "okt", "nov", "dec"];
+  var WEEKDAYS = ["söndag", "måndag", "tisdag", "onsdag", "torsdag", "fredag", "lördag"];
 
   var selected = null;
+  var saved = false;
 
   function toDate(str) {
     var p = str.split("-");
@@ -81,6 +82,31 @@
   function fmtLong(d) {
     return d.getDate() + " " + MONTHS[d.getMonth()] + " " + d.getFullYear();
   }
+  function weekday(d) { return WEEKDAYS[d.getDay()]; }
+  function sek(n) {
+    return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0") + "\u00a0kr";
+  }
+  function field(id) { return document.getElementById(id); }
+
+  function nightsOf(w) {
+    return Math.round((w.to - w.from) / 86400000);
+  }
+  function priceOf(w) {
+    var nights = nightsOf(w);
+    if (nights < 1) return { nights: nights, amount: 0, kind: "none" };
+    if (w.premium) return { nights: nights, amount: PRICE_PREMIUM, kind: "premium" };
+    if (nights >= 7) return { nights: nights, amount: PRICE_WEEK, kind: "week" };
+    return { nights: nights, amount: nights * PRICE_DAY, kind: "days" };
+  }
+  function priceLabel(p) {
+    if (p.kind === "premium") return sek(p.amount) + ", premiumvecka";
+    if (p.kind === "week") return sek(p.amount);
+    if (p.kind === "days") return sek(p.amount) + " (" + p.nights + " dygn × " + sek(PRICE_DAY) + ")";
+    return "Inget dygn inom säsongen";
+  }
+  function canBook(w) {
+    return !w.booked && priceOf(w).kind !== "none";
+  }
 
   function buildWeeks(seasonKey) {
     var start = toDate(SEASONS[seasonKey].start);
@@ -115,16 +141,28 @@
     return d.getFullYear() + "-" + pad(d.getMonth() + 1);
   }
 
+  function stateText(w, price, isSel) {
+    var base;
+    if (w.booked) base = "Bokad";
+    else if (price.kind === "none") base = "Ingen natt i säsongen";
+    else if (w.premium) base = "Premium · " + sek(price.amount);
+    else if (price.kind === "days") base = "Ledig · " + price.nights + " dygn · " + sek(price.amount);
+    else base = "Ledig · " + sek(price.amount);
+    return isSel ? "Vald · " + base : base;
+  }
+
   function render(seasonKey) {
-    var grid = document.getElementById("calendar");
-    var summary = document.getElementById("seasonSummary");
+    var grid = field("calendar");
+    var summary = field("seasonSummary");
     if (!grid) return;
     var weeks = buildWeeks(seasonKey);
-    var counts = { ok: 0, premium: 0, booked: 0 };
+    var counts = { ok: 0, premium: 0, booked: 0, short: 0 };
     var groups = [];
     var index = {};
     weeks.forEach(function (w) {
+      var price = priceOf(w);
       if (w.booked) counts.booked += 1;
+      else if (price.kind === "none") counts.short += 1;
       else if (w.premium) counts.premium += 1;
       else counts.ok += 1;
       var mk = monthKey(w.from);
@@ -144,20 +182,29 @@
       var wrap = document.createElement("div");
       wrap.className = "weeks";
       g.items.forEach(function (w) {
+        var price = priceOf(w);
         var btn = document.createElement("button");
         btn.type = "button";
-        var cls = w.booked ? "booked" : (w.premium ? "premium" : "ok");
-        btn.className = "week " + cls;
-        if (selected && selected.key === w.key) btn.classList.add("is-selected");
-        var state = w.booked ? "Bokad" : (w.premium ? "Ledig · premium 11 000 kr/vecka" : "Ledig");
-        btn.setAttribute("aria-pressed", selected && selected.key === w.key ? "true" : "false");
-        if (w.booked) btn.setAttribute("aria-disabled", "true");
-        btn.setAttribute("aria-label", "Vecka " + w.week + ", " + fmtDay(w.from) + "–" + fmtDay(w.to) + ", " + state);
-        btn.innerHTML =
-          '<span class="num">v' + w.week + '</span>' +
-          '<span class="when">' + fmtDay(w.from) + "–" + fmtDay(w.to) + "</span>" +
-          '<span class="state">' + state + "</span>";
-        btn.addEventListener("click", function () { choose(w, seasonKey); });
+        var cls = w.booked ? "booked" : (price.kind === "none" ? "short" : (w.premium ? "premium" : "ok"));
+        var isSel = !!(selected && selected.key === w.key);
+        btn.className = "week " + cls + (isSel ? " is-selected" : "");
+        var state = stateText(w, price, isSel);
+        btn.setAttribute("aria-pressed", isSel ? "true" : "false");
+        if (!canBook(w)) btn.setAttribute("aria-disabled", "true");
+        btn.setAttribute("aria-label", "Vecka " + w.week + ", " + fmtLong(w.from) + "–" + fmtLong(w.to) + ", " + state);
+        var num = document.createElement("span");
+        num.className = "num";
+        num.textContent = "v" + w.week;
+        var when = document.createElement("span");
+        when.className = "when";
+        when.textContent = fmtDay(w.from) + "–" + fmtDay(w.to);
+        var stateEl = document.createElement("span");
+        stateEl.className = "state";
+        stateEl.textContent = state;
+        btn.appendChild(num);
+        btn.appendChild(when);
+        btn.appendChild(stateEl);
+        btn.addEventListener("click", function () { choose(w); });
         wrap.appendChild(btn);
       });
       block.appendChild(h);
@@ -166,94 +213,251 @@
     });
 
     if (summary) {
-      var total = counts.ok + counts.premium + counts.booked;
-      summary.textContent =
-        "Totalt " + total + " veckor · Lediga: " + counts.ok +
+      var total = counts.ok + counts.premium + counts.booked + counts.short;
+      var text = "Totalt " + total + " veckor · Lediga: " + counts.ok +
         " · Premium: " + counts.premium +
         " · Bokade: " + counts.booked;
+      if (counts.short) text += " · Utan natt: " + counts.short;
+      summary.textContent = text;
     }
   }
 
-  function setField(id, value) {
-    var el = document.getElementById(id);
-    if (el) el.value = value;
+  function setStatus(text, kind) {
+    var el = field("requestStatus");
+    if (!el) return;
+    el.textContent = text || "";
+    el.className = "status" + (kind ? " is-" + kind : "");
+  }
+
+  function setHint() {
+    var hint = field("saveHint");
+    var send = field("sendRequest");
+    if (send) send.disabled = !selected;
+    if (!hint) return;
+    hint.textContent = selected
+      ? "Sparar bara här på sidan. Inget mejl skickas."
+      : "Välj en vecka i steg 1 för att kunna spara.";
+  }
+
+  function setHidden(w) {
+    var price = w ? priceOf(w) : null;
+    field("fieldWeekKey").value = w ? w.key : "";
+    field("fieldWeek").value = w ? String(w.week) : "";
+    field("fieldIn").value = w ? iso(w.from) : "";
+    field("fieldOut").value = w ? iso(w.to) : "";
+    field("fieldPrice").value = price && price.kind !== "none" ? String(price.amount) : "";
+  }
+
+  function renderChoice() {
+    var box = field("valdVecka");
+    if (!box) return;
+    box.textContent = "";
+    if (!selected) {
+      box.className = "choice is-empty";
+      var p = document.createElement("p");
+      p.textContent = "Ingen vecka vald. Välj en ledig vecka i steg 1.";
+      box.appendChild(p);
+      return;
+    }
+    box.className = "choice";
+    var price = priceOf(selected);
+    var dl = document.createElement("dl");
+    [
+      ["Vecka", "Vecka " + selected.week + ", " + selected.year],
+      ["Incheckning", weekday(selected.from) + " " + fmtLong(selected.from)],
+      ["Utcheckning", weekday(selected.to) + " " + fmtLong(selected.to)],
+      ["Pris", priceLabel(price)]
+    ].forEach(function (row) {
+      var wrap = document.createElement("div");
+      var dt = document.createElement("dt");
+      dt.textContent = row[0];
+      var dd = document.createElement("dd");
+      dd.textContent = row[1];
+      wrap.appendChild(dt);
+      wrap.appendChild(dd);
+      dl.appendChild(wrap);
+    });
+    box.appendChild(dl);
+    if (price.kind === "days") {
+      var note = document.createElement("p");
+      note.className = "hint";
+      note.textContent = "Veckan är kortare än sju dygn eftersom säsongen tar slut " + fmtLong(selected.to) + ". Priset är 1\u00a0100\u00a0kr per dygn.";
+      box.appendChild(note);
+    }
+  }
+
+  function currentSeason() {
+    var season = document.querySelector(".seasons button[aria-selected='true']");
+    return season ? season.getAttribute("data-season") : "winter";
+  }
+
+  function noteCalendar(text) {
+    var el = field("calendarNote");
+    if (el) el.textContent = text || "";
   }
 
   function choose(w) {
-    var status = document.getElementById("requestStatus");
-    if (w.booked) {
-      if (status) status.textContent = "Vecka " + w.week + " är bokad och kan inte väljas.";
+    if (!canBook(w)) {
+      noteCalendar(w.booked
+        ? "Vecka " + w.week + " är bokad och går inte att välja."
+        : "Vecka " + w.week + " har ingen natt inom säsongen och går inte att välja.");
       return;
     }
+    var changed = !selected || selected.key !== w.key;
     selected = w;
-    setField("fieldWeek", "Vecka " + w.week);
-    setField("fieldIn", fmtLong(w.from));
-    setField("fieldOut", fmtLong(w.to));
-    var send = document.getElementById("sendRequest");
-    if (send) send.disabled = false;
-    var days = Math.round((w.to - w.from) / 86400000);
-    if (status) {
-      status.textContent = days < 7
-        ? "Vecka " + w.week + " är vald. Säsongen tar slut inne i veckan, så datumen är de som syns i kalendern."
-        : "Vecka " + w.week + " är ifylld. Skicka förfrågan när du vill — ingen betalning sker här.";
+    if (changed && saved) {
+      saved = false;
+      setStatus("Du har valt en annan vecka. Spara igen om det här ska gälla. Inget mejl skickas.", "");
+    } else if (!saved) {
+      setStatus("", "");
     }
-    var season = document.querySelector(".seasons button[aria-selected='true']");
-    render(season ? season.getAttribute("data-season") : "winter");
-    var panel = document.getElementById("bokning");
-    if (panel && window.matchMedia("(max-width: 719px)").matches) {
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    noteCalendar("");
+    setHidden(w);
+    setHint();
+    renderChoice();
+    render(currentSeason());
+    var box = field("valdVecka");
+    if (!box) return;
+    var narrow = window.matchMedia("(max-width: 899px)").matches;
+    if (narrow) {
+      var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      box.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
     }
-    var weekField = document.getElementById("fieldWeek");
-    if (weekField) weekField.focus();
+    box.focus({ preventScroll: !narrow });
   }
 
-  function formUrl(w) {
-    var params = new URLSearchParams();
-    params.set("usp", "pp_url");
-    if (!w) return FORM + "?" + params.toString();
-    params.set("entry." + ENTRY_WEEK, "Vecka " + w.week);
-    params.set("entry." + ENTRY_IN + "_year", String(w.from.getFullYear()));
-    params.set("entry." + ENTRY_IN + "_month", String(w.from.getMonth() + 1));
-    params.set("entry." + ENTRY_IN + "_day", String(w.from.getDate()));
-    params.set("entry." + ENTRY_OUT + "_year", String(w.to.getFullYear()));
-    params.set("entry." + ENTRY_OUT + "_month", String(w.to.getMonth() + 1));
-    params.set("entry." + ENTRY_OUT + "_day", String(w.to.getDate()));
-    return FORM + "?" + params.toString();
+  function clearWeek() {
+    selected = null;
+    saved = false;
+    setHidden(null);
+    setHint();
+    renderChoice();
+    setStatus("", "");
+    noteCalendar("");
+    ["guestName", "guestEmail", "guestPhone", "guestCount", "guestMessage"].forEach(function (id) {
+      var el = field(id);
+      if (el) el.removeAttribute("aria-invalid");
+    });
+  }
+
+  function markInvalid(id, on) {
+    var el = field(id);
+    if (!el) return;
+    if (on) el.setAttribute("aria-invalid", "true");
+    else el.removeAttribute("aria-invalid");
+  }
+
+  function validate() {
+    ["guestName", "guestEmail", "guestPhone", "guestCount"].forEach(function (id) {
+      markInvalid(id, false);
+    });
+    if (!selected || !canBook(selected)) {
+      return { message: "Välj en ledig vecka i steg 1.", focusId: null };
+    }
+    var name = field("guestName").value.trim();
+    if (name.length < 2) return { message: "Fyll i namn.", focusId: "guestName" };
+    var email = field("guestEmail").value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { message: "Fyll i en e-postadress, till exempel namn@example.com.", focusId: "guestEmail" };
+    }
+    var phone = field("guestPhone").value.trim();
+    if (phone.replace(/\D/g, "").length < 7) {
+      return { message: "Fyll i ett telefonnummer.", focusId: "guestPhone" };
+    }
+    var guestsRaw = field("guestCount").value.trim();
+    var guests = Number(guestsRaw);
+    if (!/^\d+$/.test(guestsRaw) || guests < 1 || guests > 8) {
+      return { message: "Ange antal gäster från 1 till 8.", focusId: "guestCount" };
+    }
+    return {
+      message: "",
+      value: {
+        name: name,
+        email: email,
+        phone: phone,
+        guests: guests,
+        message: field("guestMessage").value.trim(),
+        price: priceOf(selected)
+      }
+    };
+  }
+
+  /* No mail endpoint yet. The named fields stay in the form
+     (weekKey, week, checkIn, checkOut, priceSek, name, email, phone, guests, message)
+     so a later request can read them. Do not tell the guest that email was sent. */
+  function onSubmit() {
+    var result = validate();
+    if (result.message) {
+      saved = false;
+      setStatus(result.message, "error");
+      if (result.focusId) {
+        markInvalid(result.focusId, true);
+        var el = field(result.focusId);
+        if (el) el.focus();
+      }
+      return;
+    }
+    var v = result.value;
+    field("guestName").value = v.name;
+    field("guestEmail").value = v.email;
+    field("guestPhone").value = v.phone;
+    field("guestCount").value = String(v.guests);
+    field("guestMessage").value = v.message;
+    setHidden(selected);
+    var now = new Date();
+    var clock = pad(now.getHours()) + ":" + pad(now.getMinutes());
+    var lines = [
+      "Sparat på den här sidan kl. " + clock + ".",
+      "Inget mejl har skickats. E-post är inte kopplat ännu, så ingen har tagit emot förfrågan.",
+      "",
+      "Vecka " + selected.week + ", " + selected.year,
+      "Incheckning: " + weekday(selected.from) + " " + fmtLong(selected.from),
+      "Utcheckning: " + weekday(selected.to) + " " + fmtLong(selected.to),
+      "Pris: " + priceLabel(v.price),
+      "Namn: " + v.name,
+      "E-post: " + v.email,
+      "Telefon: " + v.phone,
+      "Gäster: " + v.guests,
+      "Meddelande: " + (v.message || "inget")
+    ];
+    saved = true;
+    setStatus(lines.join("\n"), "saved");
+    var status = field("requestStatus");
+    if (status) status.focus && status.setAttribute("tabindex", "-1");
+    if (status) status.focus();
   }
 
   function init() {
-    var y = document.getElementById("year");
+    var y = field("year");
     if (y) y.textContent = String(new Date().getFullYear());
 
     var tabs = document.querySelectorAll(".seasons button");
     tabs.forEach(function (tab) {
       tab.addEventListener("click", function () {
         tabs.forEach(function (t) {
-          var on = t === tab;
-          t.setAttribute("aria-selected", on ? "true" : "false");
+          t.setAttribute("aria-selected", t === tab ? "true" : "false");
         });
-        selected = null;
-        setField("fieldWeek", "");
-        setField("fieldIn", "");
-        setField("fieldOut", "");
-        var send = document.getElementById("sendRequest");
-        if (send) send.disabled = true;
-        var status = document.getElementById("requestStatus");
-        if (status) status.textContent = "";
+        clearWeek();
         render(tab.getAttribute("data-season"));
       });
     });
 
-    var send = document.getElementById("sendRequest");
-    if (send) {
-      send.addEventListener("click", function () {
-        if (!selected) return;
-        window.open(formUrl(selected), "_blank", "noopener");
+    var form = field("bokning");
+    if (form) {
+      form.addEventListener("submit", function (event) {
+        event.preventDefault();
+        onSubmit();
+      });
+      form.addEventListener("input", function (event) {
+        var t = event.target;
+        if (t && t.id) markInvalid(t.id, false);
+        if (!saved) return;
+        saved = false;
+        setStatus("Ändringen är inte sparad. Spara igen om det här ska gälla. Inget mejl skickas.", "");
       });
     }
-    var plain = document.getElementById("openFormPlain");
-    if (plain) plain.href = FORM;
 
+    clearWeek();
     render("winter");
   }
 

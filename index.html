@@ -112,9 +112,10 @@
           <p class="intro">Rökfritt och inga husdjur.</p>
           <h3>Så här bokar du</h3>
           <ol class="plain">
-            <li>Hitta en ledig vecka i kalendern.</li>
-            <li>Klicka på veckan så fylls förfrågan i, och skicka bokningsförfrågan.</li>
-            <li>Vi bekräftar via e-post/SMS och skickar betalinfo.</li>
+            <li>Välj en ledig vecka i kalendern.</li>
+            <li>Kontrollera vecka, incheckning, utcheckning och pris.</li>
+            <li>Fyll i namn, e-post, telefon, antal gäster och ett valfritt meddelande.</li>
+            <li>Spara förfrågan. Den ligger kvar på sidan. E-post är inte kopplat ännu.</li>
           </ol>
         </div>
         <aside class="panel">
@@ -132,51 +133,72 @@
 
     <section class="block" id="boka">
       <div class="wrap">
-        <h2>Kalender – lediga veckor</h2>
-        <p class="intro">Veckan räknas söndag till söndag. Klicka på en ledig vecka så fylls bokningsförfrågan i. Det är en förfrågan, inte en direktbetalning.</p>
+        <h2>Boka</h2>
+        <p class="intro">Fyra steg, på den här sidan. Ingen betalning.</p>
 
-        <div class="seasons" role="tablist" aria-label="Säsong">
-          <button type="button" role="tab" aria-selected="true" data-season="winter">Vinter 2026–2027</button>
-          <button type="button" role="tab" aria-selected="false" data-season="summer">Sommar 2027</button>
-        </div>
+        <div class="book">
+          <div class="book-cal">
+            <h3>1. Välj vecka</h3>
+            <p class="note">Veckan är söndag till söndag. Klicka på en ledig vecka. Bokade veckor går inte att välja. Premiumveckor är markerade.</p>
 
-        <div class="legend">
-          <span><i class="swatch ok" aria-hidden="true"></i>Ledigt</span>
-          <span><i class="swatch prem" aria-hidden="true"></i>Premium</span>
-          <span><i class="swatch ask" aria-hidden="true"></i>På förfrågan</span>
-          <span><i class="swatch no" aria-hidden="true"></i>Bokat</span>
-        </div>
-        <p class="summary" id="seasonSummary" aria-live="polite"></p>
-
-        <!--
-          Vecka 7–9 är bokade (Jonathan 2026-09-29). De är också premium i prislistan,
-          men bokad vinner så de går inte att välja. Vecka 12 är premium och inte bokad.
-          Vecka 13 är bokad. Vecka 14 är inte premium.
-        -->
-        <div id="calendar" aria-label="Veckokalender"></div>
-
-        <div class="split two" style="margin-top:28px">
-          <form class="panel request" id="bokning" action="#" onsubmit="return false;">
-            <h3>Bokningsförfrågan</h3>
-            <p class="note">Fylls i när du klickar en vecka. Formuläret öppnas hos Google med vecka, check-in och check-out. Ingen betalning sker på den här sidan.</p>
-            <label for="fieldWeek">Vecka</label>
-            <input id="fieldWeek" name="vecka" type="text" readonly placeholder="Välj en vecka i kalendern">
-            <label for="fieldIn">Check-in</label>
-            <input id="fieldIn" name="check-in" type="text" readonly>
-            <label for="fieldOut">Check-out</label>
-            <input id="fieldOut" name="check-out" type="text" readonly>
-            <p class="status" id="requestStatus" aria-live="polite"></p>
-            <div class="actions">
-              <button class="btn" type="button" id="sendRequest" disabled>Skicka bokningsförfrågan</button>
-              <a class="btn quiet" id="openFormPlain" href="https://docs.google.com/forms/d/e/1FAIpQLSd9ln4SxS2innp2ePUCPE21DtUbBS9gO1Y-4n2cksiLSqfEuw/viewform" target="_blank" rel="noopener">Öppna formuläret utan vald vecka</a>
+            <div class="seasons" role="tablist" aria-label="Säsong">
+              <button type="button" role="tab" aria-selected="true" data-season="winter">Vinter 2026–2027</button>
+              <button type="button" role="tab" aria-selected="false" data-season="summer">Sommar 2027</button>
             </div>
+
+            <div class="legend">
+              <span><i class="swatch ok" aria-hidden="true"></i>Ledigt</span>
+              <span><i class="swatch prem" aria-hidden="true"></i>Premium</span>
+              <span><i class="swatch no" aria-hidden="true"></i>Bokat</span>
+            </div>
+            <p class="summary" id="seasonSummary" aria-live="polite"></p>
+
+            <!--
+              Vecka 7–9 är bokade (Jonathan 2026-09-29). De är också premium i prislistan,
+              men bokad vinner så de går inte att välja. Vecka 12 är premium och inte bokad.
+              Vecka 13 är bokad. Vecka 14 är inte premium.
+            -->
+            <div id="calendar" aria-label="Veckokalender"></div>
+            <p class="note" id="calendarNote" aria-live="polite"></p>
+          </div>
+
+          <form class="book-side request" id="bokning" novalidate onsubmit="return false;" data-delivery="page-only">
+            <input type="hidden" name="weekKey" id="fieldWeekKey" value="">
+            <input type="hidden" name="week" id="fieldWeek" value="">
+            <input type="hidden" name="checkIn" id="fieldIn" value="">
+            <input type="hidden" name="checkOut" id="fieldOut" value="">
+            <input type="hidden" name="priceSek" id="fieldPrice" value="">
+
+            <h3>2. Vecka, datum och pris</h3>
+            <p class="note" id="pris">Pris: 7&nbsp;700&nbsp;kr/vecka (1&nbsp;100&nbsp;kr/dygn). Vecka 12: 11&nbsp;000&nbsp;kr/vecka. Vecka 7–9 är också 11&nbsp;000&nbsp;kr i prislistan, men de är bokade. En kortare vecka i slutet av säsongen kostar 1&nbsp;100&nbsp;kr per dygn. Faktura eller Swish efter bekräftad bokning.</p>
+            <div id="valdVecka" class="choice is-empty" tabindex="-1" aria-live="polite"></div>
+
+            <h3>3. Dina uppgifter</h3>
+            <p class="note">Namn, e-post, telefon och antal gäster behövs. Meddelande är valfritt.</p>
+
+            <label for="guestName">Namn</label>
+            <input id="guestName" name="name" type="text" autocomplete="name" maxlength="120">
+
+            <label for="guestEmail">E-post</label>
+            <input id="guestEmail" name="email" type="email" autocomplete="email" inputmode="email" maxlength="160">
+
+            <label for="guestPhone">Telefon</label>
+            <input id="guestPhone" name="phone" type="tel" autocomplete="tel" inputmode="tel" maxlength="40">
+
+            <label for="guestCount">Antal gäster</label>
+            <input id="guestCount" name="guests" type="number" inputmode="numeric" min="1" max="8" step="1" aria-describedby="guestHint">
+            <p class="hint" id="guestHint">1–8. Stugan har 8 bäddar.</p>
+
+            <label for="guestMessage">Meddelande <span class="opt">(valfritt)</span></label>
+            <textarea id="guestMessage" name="message" rows="4" maxlength="2000"></textarea>
+
+            <h3>4. Spara förfrågan</h3>
+            <div class="actions">
+              <button class="btn" type="submit" id="sendRequest" disabled aria-describedby="saveHint">Spara bokningsförfrågan</button>
+            </div>
+            <p class="note" id="saveHint">Välj en vecka i steg 1 för att kunna spara.</p>
+            <div class="status" id="requestStatus" role="status" aria-live="polite"></div>
           </form>
-          <aside class="panel" id="pris">
-            <h2>Pris</h2>
-            <p class="price-line">7700 SEK/vecka (1100 SEK/dygn)</p>
-            <p class="premium-line">Vecka 7–9 samt 12-13: 11 000 kr/vecka</p>
-            <p class="note">Faktura/Swish efter bekräftad bokning.</p>
-          </aside>
         </div>
       </div>
     </section>

@@ -21,7 +21,7 @@ Gå sedan till http://127.0.0.1:8765/ och stäng servern efteråt (Ctrl+C). Inge
 
 - `index.html` — sidan
 - `styles.css` — utseende
-- `script.js` — kalender och bokningsförfrågan
+- `script.js` — kalender och bokning på sidan
 - `favicon.svg` — ikon
 - `images/` — foton hämtade från den levande sidan
 - `README.md` — den här filen
@@ -30,13 +30,14 @@ Gå sedan till http://127.0.0.1:8765/ och stäng servern efteråt (Ctrl+C). Inge
 
 Fakta är hämtade från https://516kläppen.com/ (https://xn--516klppen-z2a.com/) den 29 sep 2026. Foton låg på `www`-värden; apex svarade 404/405 på bildfilerna.
 
-Bokning är en förfrågan. Knappen öppnar det publika Google-formuläret från sidan, med vecka, check-in och check-out ifyllda (`entry.377884520`, `entry.1022203339`, `entry.1281773319`).
+Bokning är en förfrågan på sidan, inte ett Google-formulär. Gästen väljer vecka, ser datum och pris, fyller i namn, e-post, telefon, antal gäster och ett valfritt meddelande, och sparar. Inget mejl skickas. Fälten ligger kvar i formuläret (`weekKey`, `week`, `checkIn`, `checkOut`, `priceSek`, `name`, `email`, `phone`, `guests`, `message`) så att ett senare anrop kan läsa dem. Formuläret har `data-delivery="page-only"`.
 
 ## Osäkert
 
 - JSON-LD på den gamla sidan säger `priceRange` 7000 SEK/vecka. Den synliga texten säger 7700 SEK/vecka (1100 SEK/dygn). Sidan använder 7700.
-- Premium i texten är vecka 7–9 och 12–13 à 11 000 kr/vecka. Det gamla skriptet satte v14 som premium och v13 som bokad. Texten styr priset: v14 är inte premium. v13 förblir bokad och är inte också markerad premium (kommentar i `index.html`). v7–v9 var bokade i skriptet men är premiumveckor, så de visas som lediga premiumveckor, inte bokade.
+- Premium i prislistan är vecka 7–9 och 12 à 11 000 kr/vecka. Vecka 14 är inte premium. Vecka 13 är bokad. Vecka 7–9 är bokade (Jonathan 2026-09-29) även om de står som premium i prislistan, så de går inte att välja.
 - Incheckning söndag–söndag står inte i brödtexten. Det kommer från kalenderskriptet och från formulärets fältetikett. Sista veckan i varje säsong kortas av samma sätt som i det gamla skriptet (v17 slutar 30 apr 2027, v44 är bara 31 okt 2027).
 - Sidan namnger ingen ägare. Jonathan Karlsson står inte på den levande sidan, så namnet finns inte här. Telefon och e-post är de som står på sidan.
 - Alt-texten för omslagsbilden säger vinterskog; filen visar stugan nattetid. Bilden används ändå, med sidans alt-text.
-- Formulärets datumfält är förifyllda med `entry._year/_month/_day`. Det är Googles vanliga format för datum, men det är inte testat mot ett inskickat svar.
+- E-post är avsiktligt inte kopplad. Sidan ska inte säga att en förfrågan har skickats.
+- Sista veckan i sommar (v44, 31 oktober 2027) har in- och utcheckning samma dag, alltså ingen natt. Den visas men går inte att välja. Det är samma datum som i det gamla skriptet, inte en ändring av bokade eller premiumveckor.
